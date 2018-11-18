@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"math/rand"
 	"net"
 
 	"github.com/mongodb/mongo-go-driver/bson"
@@ -39,7 +40,6 @@ func newGrpcDataServer(mng *mongo.Client) {
 	if err := s.Serve(lis); err != nil {
 		log.Fatalf("Failed to serve: %v", err)
 	}
-	fmt.Println("\nThe server has stopped")
 }
 
 func (s *grpcServer) GetSuggestions(ctx context.Context, ts *tradesuggest.TradeSuggestRequest) (*tradesuggest.TradeSuggestResponse, error) {
@@ -47,7 +47,7 @@ func (s *grpcServer) GetSuggestions(ctx context.Context, ts *tradesuggest.TradeS
 	coll := s.MongoDB.Database("tradingdw").Collection("reportdata")
 
 	var pipe []interface{}
-	pipe = append(pipe, bson.M{"$limit": 4})
+	pipe = append(pipe, bson.M{"$limit": 5})
 	cursor, errFind := coll.Aggregate(ctx, pipe)
 
 	if errFind != nil {
@@ -67,6 +67,7 @@ func (s *grpcServer) GetSuggestions(ctx context.Context, ts *tradesuggest.TradeS
 		item := new(tradesuggest.Suggestion)
 		item.Stockname = doc.Lookup("stockname").StringValue()
 		item.Rating = doc.Lookup("rating").Int32()
+		item.Direction = int32(rand.Intn(2))
 		sd = append(sd, item)
 	}
 

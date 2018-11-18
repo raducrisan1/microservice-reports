@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/mongodb/mongo-go-driver/mongo"
+	"github.com/raducrisan1/microservice-reports/stockreport"
 	"google.golang.org/grpc"
 )
 
@@ -24,7 +25,7 @@ func main() {
 	defer conn.Close()
 
 	//prepares a client to stockpersist microservice
-	//stockReportClient := stockreport.NewStockReportDataServiceClient(conn)
+	stockReportClient := stockreport.NewStockReportDataServiceClient(conn)
 
 	impulse := make(chan int, 2)
 
@@ -34,6 +35,7 @@ func main() {
 
 	mng, err := mongo.NewClient("mongodb://localhost:27017")
 	failOnError(err, "Could not create a mongodb client")
+	defer mng.Disconnect(context.Background())
 
 	go func() {
 		newGrpcDataServer(mng)
@@ -42,41 +44,39 @@ func main() {
 	err = mng.Connect(context.Background())
 	failOnError(err, "Could not connect do mongodb server")
 
-	defer mng.Disconnect(nil)
-
 	fmt.Printf("The rating node started")
-	ticker := time.Tick(time.Second * 5)
+	ticker := time.Tick(time.Second * 30)
 	osstop := ossignal()
 	stop := false
-	//coll := mng.Database("tradingdw").Collection("reportdata")
+	coll := mng.Database("tradingdw").Collection("reportdata")
 
 	for !stop {
 		select {
 		case <-ticker:
 			impulse <- 1
 		case <-impulse:
-			// startTime, _ := time.Parse(time.RFC3339, "2018-11-10 09:30Z")
-			// endTime, _ := time.Parse(time.RFC3339, "2018-11-10 10:00Z")
-			// req := new(stockreport.StockReportRequest)
-			// req.Start = startTime.Unix()
-			// req.End = endTime.Unix()
-			// req.Resolution = 300
+			startTime, _ := time.Parse(time.RFC3339, "2018-11-10 09:30Z")
+			endTime, _ := time.Parse(time.RFC3339, "2018-11-10 10:00Z")
+			req := new(stockreport.StockReportRequest)
+			req.Start = startTime.Unix()
+			req.End = endTime.Unix()
+			req.Resolution = 300
 
-			// //every 5 seconds, a call to stockinfo microservice is made.
-			// res, err := stockReportClient.GetStockReportData(context.Background(), req)
-			// if err != nil {
-			// 	fmt.Printf("An error occurred receiving data from microservice-persist: %s\n", err)
-			// 	continue
-			// }
-			// records := make([]interface{}, len(res.StockData))
-			// for index, item := range res.StockData {
-			// 	annotatedMsg := *item
-			// 	records[index] = annotatedMsg
-			// }
-			// _, newErr := coll.InsertMany(context.Background(), records)
-			// if newErr != nil {
-			// 	fmt.Printf("An error occurred saving DW: %s\n", newErr)
-			// }
+			//every 30 seconds, a call to stockinfo microservice is made.
+			res, err := stockReportClient.GetStockReportData(context.Background(), req)
+			if err != nil {
+				fmt.Printf("An error occurred receiving data from microservice-persist: %s\n", err)
+				continue
+			}
+			records := make([]interface{}, len(res.StockData))
+			for index, item := range res.StockData {
+				annotatedMsg := *item
+				records[index] = annotatedMsg
+			}
+			_, newErr := coll.InsertMany(context.Background(), records)
+			if newErr != nil {
+				fmt.Printf("An error occurred saving DW: %s\n", newErr)
+			}
 
 		case <-osstop:
 			stop = true
@@ -84,5 +84,5 @@ func main() {
 		}
 	}
 
-	fmt.Println("\nThe server has stopped")
+	fmt.Println("\nThe node has stopped")
 }
