@@ -1,0 +1,65 @@
+---
+apiVersion: "v1"
+kind: "ConfigMap"
+metadata:
+  name: "reports-config"
+  namespace: "itdays"
+  labels:
+    app: "reports"
+data:
+  MONGO_ADDR: "mongodb://mongodb-mongodb-replicaset.itdays:27017"
+  PERSIST_GRPC_ADDR: "persist-service.itdays:3050"
+  REPORTS_LISTEN_ADDR: ":3070"
+---
+apiVersion: "extensions/v1beta1"
+kind: "Deployment"
+metadata:
+  name: "reports"
+  namespace: "itdays"
+  labels:
+    app: "reports"
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: "reports"
+  template:
+    metadata:
+      labels:
+        app: "reports"
+    spec:
+      containers:
+      - name: "microservice-persist"
+        image: "gcr.io/itdays-201118/microservice-persist:latest"
+        env:
+        - name: "MONGO_ADDR"
+          valueFrom:
+            configMapKeyRef:
+              key: "MONGO_ADDR"
+              name: "reports-config"
+        - name: "PERSIST_GRPC_ADDR"
+          valueFrom:
+            configMapKeyRef:
+              key: "PERSIST_GRPC_ADDR"
+              name: "reports-config"
+        - name: "REPORTS_LISTEN_ADDR"
+          valueFrom:
+            configMapKeyRef:
+              key: "REPORTS_LISTEN_ADDR"
+              name: "reports-config"
+---
+apiVersion: "autoscaling/v1"
+kind: "HorizontalPodAutoscaler"
+metadata:
+  name: "reports-hpa"
+  namespace: "itdays"
+  labels:
+    app: "reports"
+spec:
+  scaleTargetRef:
+    kind: "Deployment"
+    name: "reports"
+    apiVersion: "apps/v1beta1"
+  minReplicas: 1
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 80

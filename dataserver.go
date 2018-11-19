@@ -6,6 +6,7 @@ import (
 	"log"
 	"math/rand"
 	"net"
+	"os"
 
 	"github.com/mongodb/mongo-go-driver/bson"
 	"github.com/mongodb/mongo-go-driver/mongo"
@@ -20,7 +21,8 @@ type grpcServer struct {
 }
 
 func newGrpcDataServer(mng *mongo.Client) {
-	lis, err := net.Listen("tcp", ":3070")
+	listenAddr := os.Getenv("REPORTS_LISTEN_ADDR")
+	lis, err := net.Listen("tcp", listenAddr)
 	if err != nil {
 		log.Fatalf("Failed to listen: %v", err)
 	}
@@ -36,7 +38,7 @@ func newGrpcDataServer(mng *mongo.Client) {
 		<-stop
 		s.Stop()
 	}()
-	fmt.Println("StockReports node started listening for incoming connections on port 3070")
+	fmt.Println("Listening for incoming connections on port 3070")
 	if err := s.Serve(lis); err != nil {
 		log.Fatalf("Failed to serve: %v", err)
 	}

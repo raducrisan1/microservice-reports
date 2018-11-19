@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"time"
 
 	"github.com/mongodb/mongo-go-driver/mongo"
@@ -19,8 +20,8 @@ func failOnError(err error, msg string) {
 }
 
 func main() {
-
-	conn, err := grpc.Dial("localhost:3050", grpc.WithInsecure())
+	persistAddr := os.Getenv("PERSIST_GRPC_ADDR")
+	conn, err := grpc.Dial(persistAddr, grpc.WithInsecure())
 	failOnError(err, "Could not connect to microservice-persist gRPC server")
 	defer conn.Close()
 
@@ -33,7 +34,8 @@ func main() {
 		impulse <- 1
 	}()
 
-	mng, err := mongo.NewClient("mongodb://localhost:27017")
+	mongoAddr := os.Getenv("MONGO_ADDR")
+	mng, err := mongo.NewClient(mongoAddr)
 	failOnError(err, "Could not create a mongodb client")
 	defer mng.Disconnect(context.Background())
 
@@ -44,7 +46,7 @@ func main() {
 	err = mng.Connect(context.Background())
 	failOnError(err, "Could not connect do mongodb server")
 
-	fmt.Printf("The rating node started")
+	fmt.Printf("The reports node started\n")
 	ticker := time.Tick(time.Second * 30)
 	osstop := ossignal()
 	stop := false
